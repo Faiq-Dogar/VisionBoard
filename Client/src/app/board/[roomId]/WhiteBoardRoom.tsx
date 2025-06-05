@@ -21,6 +21,7 @@ const WhiteBoardRoom = () => {
   const isDrawing = useRef(false);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [lineColor, setLineColor] = useState<string>("#000");
+  const [lineSize, setLineSize] = useState<number>(2);
 
   useEffect(() => {
     const updateSize = () => {
@@ -82,6 +83,16 @@ const WhiteBoardRoom = () => {
               onChange={(e) => setLineColor(e.target.value)}
             />
           ))}
+          <label className="mr-2 font-medium text-black ml-7">
+            Select Size:{" "}
+          </label>
+          <input
+            type="range"
+            min="0"
+            max="10"
+            onChange={(e) => setLineSize(Number(e.target.value))}
+          />
+          <span className="text-black ml-4">{lineSize}px</span>
         </div>
         <Divider />
 
@@ -97,8 +108,8 @@ const WhiteBoardRoom = () => {
               <Line
                 key={i}
                 points={line.points}
-                stroke={lineColor} //color
-                strokeWidth={2} //thickness
+                stroke={lineColor}
+                strokeWidth={lineSize}
                 tension={0.5}
                 lineCap="round"
                 globalCompositeOperation="source-over"
