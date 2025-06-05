@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import PaletteIcon from "@mui/icons-material/Palette";
 import { Divider } from "@mui/material";
+import ChatDrawer from "./ChatDrawer";
 const lineColorOptions = [
   { name: "black", value: "#000000" },
   { name: "red", value: "#ee4444" },
@@ -26,7 +27,7 @@ const WhiteBoardRoom = () => {
   useEffect(() => {
     const updateSize = () => {
       setDimensions({
-        width: window.innerWidth,
+        width: window.innerWidth - 350,
         height: window.innerHeight - 150,
       });
     };
@@ -67,7 +68,7 @@ const WhiteBoardRoom = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
           // className="text-7xl md:text-8xl font-black bg-gradient-to-r from-slate-900 via-indigo-900 to-purple-900 bg-clip-text text-transparent mb-4 leading-tight"
-          className="text-6xl font-extrabold text-gray-900 drop-shadow-md text-center"
+          className="text-6xl font-extrabold text-gray-900 drop-shadow-md text-center my-3"
         >
           VisionBoard
         </motion.h1>
@@ -95,41 +96,47 @@ const WhiteBoardRoom = () => {
           <span className="text-black ml-4">{lineSize}px</span>
         </div>
         <Divider />
+        <div className="flex h-screen">
+          {/* Left: Drawing Canvas */}
+          <Stage
+            width={dimensions.width}
+            height={dimensions.height}
+            onMouseDown={handleMouseDown}
+            onMousemove={handleMouseMove}
+            onMouseup={handleMouseUp}
+          >
+            <Layer>
+              {lines.map((line, i) => (
+                <Line
+                  key={i}
+                  points={line.points}
+                  stroke={lineColor}
+                  strokeWidth={lineSize}
+                  tension={0.5}
+                  lineCap="round"
+                  globalCompositeOperation="source-over"
+                />
+              ))}
 
-        <Stage
-          width={dimensions.width}
-          height={dimensions.height}
-          onMouseDown={handleMouseDown}
-          onMousemove={handleMouseMove}
-          onMouseup={handleMouseUp}
-        >
-          <Layer>
-            {lines.map((line, i) => (
-              <Line
-                key={i}
-                points={line.points}
-                stroke={lineColor}
-                strokeWidth={lineSize}
-                tension={0.5}
-                lineCap="round"
-                globalCompositeOperation="source-over"
-              />
-            ))}
+              {/* Example Circle (commented) */}
+              {/* <Circle
+        x={circlePos.x}
+        y={circlePos.y}
+        radius={30}
+        fill="skyblue"
+        stroke="navy"
+        strokeWidth={2}
+        draggable
+        onDragEnd={(e) =>
+          setCirclePos({ x: e.target.x(), y: e.target.y() })
+        }
+      /> */}
+            </Layer>
+          </Stage>
 
-            {/* <Circle
-              x={circlePos.x}
-              y={circlePos.y}
-              radius={30}
-              fill="skyblue"
-              stroke="navy"
-              strokeWidth={2}
-              draggable
-              onDragEnd={(e) =>
-                setCirclePos({ x: e.target.x(), y: e.target.y() })
-              }
-            /> */}
-          </Layer>
-        </Stage>
+          {/* Right: Chat Drawer */}
+          <ChatDrawer />
+        </div>
       </div>
     </>
   );
