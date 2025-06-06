@@ -1,6 +1,6 @@
 "use client";
 
-import { Stage, Layer, Line, Circle, Transformer } from "react-konva";
+import { Stage, Layer, Line, Circle, Rect, Transformer } from "react-konva";
 
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
@@ -32,13 +32,14 @@ const tools = [
 const WhiteBoardRoom = () => {
   const [lines, setLines] = useState<any[]>([]);
   const [circles, setCircles] = useState<any[]>([]);
-  const [circlePos, setCirclePos] = useState({ x: 200, y: 200 });
+  const [rectangle, setRect] = useState<any[]>([]);
   const isDrawing = useRef(false);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [lineColor, setLineColor] = useState<string>("#000");
   const [shapeBgColor, setShapeBgColor] = useState<string>("skyblue");
   const [shapeBorderColor, setShapeBorderColor] = useState<string>("navy");
   const [shapeRadius, setShapeRadius] = useState<number>(30);
+  const [shapeHeight, setShapeHeight] = useState<number>(30);
 
   const [lineSize, setLineSize] = useState<number>(2);
   const [selectedTool, setSelectedTool] = useState("pen");
@@ -54,6 +55,11 @@ const WhiteBoardRoom = () => {
     window.addEventListener("resize", updateSize);
     return () => window.removeEventListener("resize", updateSize);
   }, []);
+
+  useEffect(() => {
+    setShapeRadius(30);
+    setShapeHeight(30);
+  }, [selectedTool]);
 
   const handleMouseDown = (e: any) => {
     const pos = e.target.getStage().getPointerPosition();
@@ -71,6 +77,21 @@ const WhiteBoardRoom = () => {
         },
       ]);
       return;
+    }
+
+    if (selectedTool === "rectangle") {
+      setRect((prev) => [
+        ...prev,
+        {
+          x: pos.x,
+          y: pos.y,
+          width: shapeRadius * 2,
+          height: shapeHeight * 2,
+          fill: shapeBgColor,
+          stroke: shapeBorderColor,
+          strokeWidth: lineSize,
+        },
+      ]);
     }
 
     isDrawing.current = true;
@@ -174,7 +195,7 @@ const WhiteBoardRoom = () => {
                     key={color.name}
                     type="color"
                     value={color.value}
-                    className="cursor-pointer w-7 h-5 border-none px-1"
+                    className="cursor-pointer w-7 h-5 px-1 rounded-3xl outline-none ring-0 focus:outline-none focus:ring-0"
                     onChange={(e) => setLineColor(e.target.value)}
                   />
                 ))}
@@ -223,7 +244,7 @@ const WhiteBoardRoom = () => {
               className="w-30"
             />
             <span className="text-black ml-4 text-sm">{lineSize}px</span>
-            {selectedTool !== "pen" && (
+            {selectedTool === "circle" && (
               <>
                 <label className="mx-2 font-medium text-black text-sm">
                   Radius:{" "}
@@ -232,11 +253,40 @@ const WhiteBoardRoom = () => {
                   type="range"
                   min="10"
                   max="100"
+                  defaultValue={50}
+                  onChange={(e) => setShapeRadius(Number(e.target.value))}
+                  className="w-30"
+                />
+                <span className="text-black ml-4 text-sm">{shapeRadius}px</span>
+              </>
+            )}
+
+            {selectedTool === "rectangle" && (
+              <>
+                <label className="mx-2 font-medium text-black text-sm">
+                  width:{" "}
+                </label>
+                <input
+                  type="range"
+                  min="10"
+                  max="500"
                   defaultValue={30}
                   onChange={(e) => setShapeRadius(Number(e.target.value))}
                   className="w-30"
                 />
                 <span className="text-black ml-4 text-sm">{shapeRadius}px</span>
+                <label className="mx-2 font-medium text-black text-sm">
+                  Height:{" "}
+                </label>
+                <input
+                  type="range"
+                  min="10"
+                  max="500"
+                  defaultValue={30}
+                  onChange={(e) => setShapeHeight(Number(e.target.value))}
+                  className="w-30"
+                />
+                <span className="text-black ml-4 text-sm">{shapeHeight}px</span>
               </>
             )}
           </div>
@@ -266,7 +316,7 @@ const WhiteBoardRoom = () => {
                 />
               ))}
 
-              {/* Example Circle (commented) */}
+              {/* Circles */}
               {circles.map((circle, i) => (
                 <Circle
                   key={i}
@@ -287,6 +337,32 @@ const WhiteBoardRoom = () => {
                         (_, index) => index !== i
                       );
                       setCircles(updatedCircles);
+                    }
+                  }}
+                />
+              ))}
+
+              {/* Rectangles */}
+              {rectangle.map((rectan, i) => (
+                <Rect
+                  key={i}
+                  {...rectan}
+                  draggable
+                  onDragEnd={(e) =>
+                    setRect((prev) =>
+                      prev.map((r, index) =>
+                        index === i
+                          ? { ...r, x: e.target.x(), y: e.target.y() }
+                          : r
+                      )
+                    )
+                  }
+                  onClick={() => {
+                    if (selectedTool === "eraser") {
+                      const updatedRectangle = rectangle.filter(
+                        (_, index) => index !== i
+                      );
+                      setRect(updatedRectangle);
                     }
                   }}
                 />
