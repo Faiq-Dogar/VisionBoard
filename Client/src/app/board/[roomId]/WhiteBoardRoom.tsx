@@ -1,11 +1,13 @@
 "use client";
 
-import { Stage, Layer, Line, Circle } from "react-konva";
+import { Stage, Layer, Line, Circle, Transformer } from "react-konva";
+
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import PaletteIcon from "@mui/icons-material/Palette";
 import EditIcon from "@mui/icons-material/Edit";
 import CreateOutlinedIcon from "@mui/icons-material/CreateOutlined";
+import ClearOutlinedIcon from "@mui/icons-material/ClearOutlined";
 import CircleOutlinedIcon from "@mui/icons-material/CircleOutlined";
 import SquareOutlinedIcon from "@mui/icons-material/CropSquare";
 import { Badge, Button, Divider } from "@mui/material";
@@ -22,7 +24,7 @@ const lineColorOptions = [
 
 const tools = [
   { id: "pen", icon: EditIcon, label: "Pen" },
-  { id: "eraser", icon: CreateOutlinedIcon, label: "Eraser" },
+  { id: "eraser", icon: ClearOutlinedIcon, label: "Eraser" },
   { id: "circle", icon: CircleOutlinedIcon, label: "Circle" },
   { id: "rectangle", icon: SquareOutlinedIcon, label: "Rectangle" },
 ];
@@ -34,6 +36,10 @@ const WhiteBoardRoom = () => {
   const isDrawing = useRef(false);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [lineColor, setLineColor] = useState<string>("#000");
+  const [shapeBgColor, setShapeBgColor] = useState<string>("skyblue");
+  const [shapeBorderColor, setShapeBorderColor] = useState<string>("navy");
+  const [shapeRadius, setShapeRadius] = useState<number>(30);
+
   const [lineSize, setLineSize] = useState<number>(2);
   const [selectedTool, setSelectedTool] = useState("pen");
 
@@ -58,10 +64,10 @@ const WhiteBoardRoom = () => {
         {
           x: pos.x,
           y: pos.y,
-          radius: 30,
-          fill: "skyblue",
-          stroke: "navy",
-          strokeWidth: 2,
+          radius: shapeRadius,
+          fill: shapeBgColor,
+          stroke: shapeBorderColor,
+          strokeWidth: lineSize,
         },
       ]);
       return;
@@ -72,14 +78,20 @@ const WhiteBoardRoom = () => {
       ...lines,
       {
         points: [pos.x, pos.y],
-        stroke: lineColor,
-        strokeWidth: lineSize,
+        stroke: selectedTool === "eraser" ? "#000000" : lineColor,
+        strokeWidth: lineSize + (selectedTool === "eraser" ? 5 : 0),
+        globalCompositeOperation:
+          selectedTool === "eraser" ? "destination-out" : "source-over",
       },
     ]);
   };
 
   const handleMouseMove = (e: any) => {
-    if (!isDrawing.current || selectedTool !== "pen") return;
+    if (
+      !isDrawing.current ||
+      (selectedTool !== "pen" && selectedTool !== "eraser")
+    )
+      return;
 
     const stage = e.target.getStage();
     const point = stage.getPointerPosition();
@@ -148,22 +160,55 @@ const WhiteBoardRoom = () => {
             ))}
           </div>
           <div className="item-center flex">
-            <label className="text-sm mr-2 font-medium text-black">
-              <PaletteIcon
-                className="text-slate-600"
-                style={{ fontSize: "1rem" }}
-              />{" "}
-              Color:
-            </label>
-            {lineColorOptions.map((color) => (
-              <input
-                key={color.name}
-                type="color"
-                value={color.value}
-                className="cursor-pointer w-7 h-5 border-none px-1"
-                onChange={(e) => setLineColor(e.target.value)}
-              />
-            ))}
+            {selectedTool === "pen" ? (
+              <>
+                <label className="text-sm mr-2 font-medium text-black">
+                  <PaletteIcon
+                    className="text-slate-600"
+                    style={{ fontSize: "1rem" }}
+                  />{" "}
+                  Color:
+                </label>
+                {lineColorOptions.map((color) => (
+                  <input
+                    key={color.name}
+                    type="color"
+                    value={color.value}
+                    className="cursor-pointer w-7 h-5 border-none px-1"
+                    onChange={(e) => setLineColor(e.target.value)}
+                  />
+                ))}
+              </>
+            ) : (
+              <>
+                <label className="text-sm mr-2 font-medium text-black">
+                  <PaletteIcon
+                    className="text-slate-600"
+                    style={{ fontSize: "1rem" }}
+                  />{" "}
+                  Color:
+                </label>
+                <input
+                  type="color"
+                  value={shapeBgColor}
+                  className="cursor-pointer w-7 h-5 border-none px-1"
+                  onChange={(e) => setShapeBgColor(e.target.value)}
+                />
+                <label className="text-sm mr-2 font-medium text-black">
+                  <PaletteIcon
+                    className="text-slate-600"
+                    style={{ fontSize: "1rem" }}
+                  />{" "}
+                  Border color:
+                </label>
+                <input
+                  type="color"
+                  value={shapeBorderColor}
+                  className="cursor-pointer w-7 h-5 border-none px-1"
+                  onChange={(e) => setShapeBorderColor(e.target.value)}
+                />
+              </>
+            )}
           </div>
           <div className="item-center flex">
             <label className="mr-2 font-medium text-black text-sm">
@@ -173,10 +218,27 @@ const WhiteBoardRoom = () => {
               type="range"
               min="1"
               max="10"
+              defaultValue={2}
               onChange={(e) => setLineSize(Number(e.target.value))}
               className="w-30"
             />
             <span className="text-black ml-4 text-sm">{lineSize}px</span>
+            {selectedTool !== "pen" && (
+              <>
+                <label className="mx-2 font-medium text-black text-sm">
+                  Radius:{" "}
+                </label>
+                <input
+                  type="range"
+                  min="10"
+                  max="100"
+                  defaultValue={30}
+                  onChange={(e) => setShapeRadius(Number(e.target.value))}
+                  className="w-30"
+                />
+                <span className="text-black ml-4 text-sm">{shapeRadius}px</span>
+              </>
+            )}
           </div>
         </div>
         <Divider />
@@ -198,7 +260,9 @@ const WhiteBoardRoom = () => {
                   strokeWidth={line.strokeWidth}
                   tension={0.5}
                   lineCap="round"
-                  globalCompositeOperation="source-over"
+                  globalCompositeOperation={
+                    line.globalCompositeOperation || "source-over"
+                  }
                 />
               ))}
 
@@ -217,6 +281,14 @@ const WhiteBoardRoom = () => {
                       )
                     )
                   }
+                  onClick={() => {
+                    if (selectedTool === "eraser") {
+                      const updatedCircles = circles.filter(
+                        (_, index) => index !== i
+                      );
+                      setCircles(updatedCircles);
+                    }
+                  }}
                 />
               ))}
             </Layer>
@@ -231,3 +303,10 @@ const WhiteBoardRoom = () => {
 };
 
 export default WhiteBoardRoom;
+//Circle
+//image
+//Line types
+//Rectangle
+//Rectangle Types
+//Text
+// When selectedTool is circle then apply then fill the circle if the circle with the selected color
