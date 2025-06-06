@@ -68,7 +68,14 @@ const WhiteBoardRoom = () => {
     }
 
     isDrawing.current = true;
-    setLines([...lines, { points: [pos.x, pos.y] }]);
+    setLines([
+      ...lines,
+      {
+        points: [pos.x, pos.y],
+        stroke: lineColor,
+        strokeWidth: lineSize,
+      },
+    ]);
   };
 
   const handleMouseMove = (e: any) => {
@@ -77,10 +84,10 @@ const WhiteBoardRoom = () => {
     const stage = e.target.getStage();
     const point = stage.getPointerPosition();
     const lastLine = lines[lines.length - 1];
+    let newLines = lines.slice(0, -1);
     lastLine.points = lastLine.points.concat([point.x, point.y]);
 
-    const newLines = lines.slice(0, -1).concat(lastLine);
-    setLines(newLines);
+    setLines([...newLines, lastLine]);
   };
 
   const handleMouseUp = () => {
@@ -187,8 +194,8 @@ const WhiteBoardRoom = () => {
                 <Line
                   key={i}
                   points={line.points}
-                  stroke={lineColor}
-                  strokeWidth={lineSize}
+                  stroke={line.stroke}
+                  strokeWidth={line.strokeWidth}
                   tension={0.5}
                   lineCap="round"
                   globalCompositeOperation="source-over"
