@@ -1,20 +1,20 @@
 "use client";
 
 import { Stage, Layer, Line, Circle, Rect, Transformer } from "react-konva";
-
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import PaletteIcon from "@mui/icons-material/Palette";
 import EditIcon from "@mui/icons-material/Edit";
-import CreateOutlinedIcon from "@mui/icons-material/CreateOutlined";
 import ClearOutlinedIcon from "@mui/icons-material/ClearOutlined";
 import CircleOutlinedIcon from "@mui/icons-material/CircleOutlined";
 import SquareOutlinedIcon from "@mui/icons-material/CropSquare";
 import DownloadIcon from "@mui/icons-material/Download";
 import ShareIcon from "@mui/icons-material/Share";
 import PeopleIcon from "@mui/icons-material/People";
+import MouseIcon from "@mui/icons-material/Mouse";
 import { Avatar, Badge, Button, Divider } from "@mui/material";
 import ChatDrawer from "./ChatDrawer";
+
 const lineColorOptions = [
   { name: "black", value: "#000000" },
   { name: "red", value: "#ee4444" },
@@ -26,6 +26,7 @@ const lineColorOptions = [
 ];
 
 const tools = [
+  { id: "select", icon: MouseIcon, label: "Select" },
   { id: "pen", icon: EditIcon, label: "Pen" },
   { id: "eraser", icon: ClearOutlinedIcon, label: "Eraser" },
   { id: "circle", icon: CircleOutlinedIcon, label: "Circle" },
@@ -35,18 +36,22 @@ const tools = [
 const WhiteBoardRoom = () => {
   const [lines, setLines] = useState<any[]>([]);
   const [circles, setCircles] = useState<any[]>([]);
-  const [rectangle, setRect] = useState<any[]>([]);
+  const [rectangles, setRectangles] = useState<any[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+
   const isDrawing = useRef(false);
+  const transformerRef = useRef<any>(null);
+  const stageRef = useRef<any>(null);
+
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [lineColor, setLineColor] = useState<string>("#000");
   const [shapeBgColor, setShapeBgColor] = useState<string>("skyblue");
   const [shapeBorderColor, setShapeBorderColor] = useState<string>("navy");
   const [shapeRadius, setShapeRadius] = useState<number>(30);
   const [shapeHeight, setShapeHeight] = useState<number>(30);
-
   const [lineSize, setLineSize] = useState<number>(2);
   const [selectedTool, setSelectedTool] = useState("pen");
-
   const [isOpen, setIsOpen] = useState<boolean>(true);
 
   const [connectedUsers] = useState([
@@ -80,54 +85,101 @@ const WhiteBoardRoom = () => {
   }, [isOpen]);
 
   useEffect(() => {
+    setLineSize(2);
     setShapeRadius(30);
     setShapeHeight(30);
   }, [selectedTool]);
 
+  // Update transformer when selection changes
+  useEffect(() => {
+    if (selectedId && transformerRef.current) {
+      const stage = transformerRef.current.getStage();
+      const selectedNode = stage.findOne(`#${selectedId}`);
+      if (selectedNode) {
+        transformerRef.current.nodes([selectedNode]);
+        transformerRef.current.getLayer().batchDraw();
+      }
+    } else if (transformerRef.current) {
+      transformerRef.current.nodes([]);
+      transformerRef.current.getLayer().batchDraw();
+    }
+  }, [selectedId]);
+
+  const generateId = () => `shape_${Date.now()}_${Math.random()}`;
+
+  const handleStageClick = (e: any) => {
+    // If clicking on stage (not on a shape)
+    if (e.target === e.target.getStage()) {
+      setSelectedId(null);
+      setSelectedType(null);
+      return;
+    }
+  };
+
   const handleMouseDown = (e: any) => {
+    // If we're in select mode, don't create new shapes
+    if (selectedTool === "select") {
+      handleStageClick(e);
+      return;
+    }
+
     const pos = e.target.getStage().getPointerPosition();
 
     if (selectedTool === "circle") {
-      setCircles((prev) => [
-        ...prev,
-        {
-          x: pos.x,
-          y: pos.y,
-          radius: shapeRadius,
-          fill: shapeBgColor,
-          stroke: shapeBorderColor,
-          strokeWidth: lineSize,
-        },
-      ]);
+      const id = generateId();
+      const newCircle = {
+        id,
+        x: pos.x,
+        y: pos.y,
+        radius: shapeRadius,
+        fill: shapeBgColor,
+        stroke: shapeBorderColor,
+        strokeWidth: lineSize,
+      };
+      setCircles((prev) => [...prev, newCircle]);
+
+      // Auto-select the newly created circle
+      setSelectedId(id);
+      setSelectedType("circle");
+      setSelectedTool("select"); // Switch to select tool after creating
       return;
     }
 
     if (selectedTool === "rectangle") {
-      setRect((prev) => [
-        ...prev,
+      const id = generateId();
+      const newRect = {
+        id,
+        x: pos.x,
+        y: pos.y,
+        width: shapeRadius * 2,
+        height: shapeHeight * 2,
+        fill: shapeBgColor,
+        stroke: shapeBorderColor,
+        strokeWidth: lineSize,
+      };
+      setRectangles((prev) => [...prev, newRect]);
+
+      // Auto-select the newly created rectangle
+      setSelectedId(id);
+      setSelectedType("rectangle");
+      setSelectedTool("select"); // Switch to select tool after creating
+      return;
+    }
+
+    // Handle pen and eraser tools
+    if (selectedTool === "pen" || selectedTool === "eraser") {
+      isDrawing.current = true;
+      setLines([
+        ...lines,
         {
-          x: pos.x,
-          y: pos.y,
-          width: shapeRadius * 2,
-          height: shapeHeight * 2,
-          fill: shapeBgColor,
-          stroke: shapeBorderColor,
-          strokeWidth: lineSize,
+          points: [pos.x, pos.y],
+          stroke: selectedTool === "eraser" ? "#000000" : lineColor,
+          strokeWidth: lineSize + (selectedTool === "eraser" ? 5 : 0),
+          globalCompositeOperation:
+            selectedTool === "eraser" ? "destination-out" : "source-over",
         },
       ]);
     }
-
-    isDrawing.current = true;
-    setLines([
-      ...lines,
-      {
-        points: [pos.x, pos.y],
-        stroke: selectedTool === "eraser" ? "#000000" : lineColor,
-        strokeWidth: lineSize + (selectedTool === "eraser" ? 5 : 0),
-        globalCompositeOperation:
-          selectedTool === "eraser" ? "destination-out" : "source-over",
-      },
-    ]);
   };
 
   const handleMouseMove = (e: any) => {
@@ -140,7 +192,7 @@ const WhiteBoardRoom = () => {
     const stage = e.target.getStage();
     const point = stage.getPointerPosition();
     const lastLine = lines[lines.length - 1];
-    let newLines = lines.slice(0, -1);
+    const newLines = lines.slice(0, -1);
     lastLine.points = lastLine.points.concat([point.x, point.y]);
 
     setLines([...newLines, lastLine]);
@@ -150,11 +202,62 @@ const WhiteBoardRoom = () => {
     isDrawing.current = false;
   };
 
+  const handleShapeClick = (id: string, type: string) => {
+    if (selectedTool === "eraser") {
+      if (type === "circle") {
+        setCircles((prev) => prev.filter((circle) => circle.id !== id));
+      } else if (type === "rectangle") {
+        setRectangles((prev) => prev.filter((rect) => rect.id !== id));
+      }
+      return;
+    }
+
+    // Select the shape
+    setSelectedId(id);
+    setSelectedType(type);
+  };
+
+  const handleTransform = (id: string, type: string, newAttrs: any) => {
+    if (type === "circle") {
+      setCircles((prev) =>
+        prev.map((circle) =>
+          circle.id === id
+            ? {
+                ...circle,
+                x: newAttrs.x,
+                y: newAttrs.y,
+                radius: Math.max(newAttrs.radius * newAttrs.scaleX, 5),
+                scaleX: 1,
+                scaleY: 1,
+              }
+            : circle
+        )
+      );
+    } else if (type === "rectangle") {
+      setRectangles((prev) =>
+        prev.map((rect) =>
+          rect.id === id
+            ? {
+                ...rect,
+                x: newAttrs.x,
+                y: newAttrs.y,
+                width: Math.max(newAttrs.width * newAttrs.scaleX, 5),
+                height: Math.max(newAttrs.height * newAttrs.scaleY, 5),
+                scaleX: 1,
+                scaleY: 1,
+              }
+            : rect
+        )
+      );
+    }
+  };
+
   if (dimensions.width === 0 || dimensions.height === 0) return null;
 
   return (
     <>
       <div className="relative h-screen w-screen bg-gradient-to-br from-[#f0f4ff] via-white to-[#f4f7ff] overflow-hidden flex flex-col justify-center px-4">
+        {/* Header */}
         <div className="flex items-center gap-4 justify-between">
           <div className="flex items-center">
             <motion.div
@@ -186,6 +289,7 @@ const WhiteBoardRoom = () => {
               Live Session
             </Badge>
           </div>
+
           <div className="flex items-center gap-4">
             {/* Connected Users */}
             <div className="flex items-center gap-2">
@@ -222,16 +326,26 @@ const WhiteBoardRoom = () => {
             </Button>
           </div>
         </div>
+
         <Divider />
+
+        {/* Toolbar */}
         <div className="p-4 flex items-center gap-15 justify-between">
           <div className="flex items-center gap-6">
+            {/* Tools */}
             <div className="flex items-center gap-1 bg-slate-200 rounded-xl p-1">
               {tools.map((tool) => (
                 <Button
                   key={tool.id}
-                  variant={selectedTool === tool.id ? "contained" : "text"} // or "contained" / "outlined"
+                  variant={selectedTool === tool.id ? "contained" : "text"}
                   size="small"
-                  onClick={() => setSelectedTool(tool.id)}
+                  onClick={() => {
+                    setSelectedTool(tool.id);
+                    if (tool.id !== "select") {
+                      setSelectedId(null);
+                      setSelectedType(null);
+                    }
+                  }}
                   className={`gap-2 ${
                     selectedTool === tool.id
                       ? "bg-slate-900 text-white shadow-md"
@@ -239,10 +353,12 @@ const WhiteBoardRoom = () => {
                   }`}
                 >
                   <tool.icon style={{ fontSize: "1rem" }} />
-                  <span className="hidden sm:inline ">{tool.label}</span>
+                  <span className="hidden sm:inline">{tool.label}</span>
                 </Button>
               ))}
             </div>
+
+            {/* Color Controls */}
             <div className="item-center flex">
               {selectedTool === "pen" ? (
                 <>
@@ -263,27 +379,23 @@ const WhiteBoardRoom = () => {
                     />
                   ))}
                 </>
-              ) : (
+              ) : selectedTool === "circle" || selectedTool === "rectangle" ? (
                 <>
                   <label className="text-sm mr-2 font-medium text-black">
                     <PaletteIcon
                       className="text-slate-600"
                       style={{ fontSize: "1rem" }}
                     />{" "}
-                    Color:
+                    Fill:
                   </label>
                   <input
                     type="color"
                     value={shapeBgColor}
-                    className="cursor-pointer w-7 h-5 border-none px-1"
+                    className="cursor-pointer w-7 h-5 border-none px-1 mr-2"
                     onChange={(e) => setShapeBgColor(e.target.value)}
                   />
                   <label className="text-sm mr-2 font-medium text-black">
-                    <PaletteIcon
-                      className="text-slate-600"
-                      style={{ fontSize: "1rem" }}
-                    />{" "}
-                    Border color:
+                    Border:
                   </label>
                   <input
                     type="color"
@@ -292,8 +404,10 @@ const WhiteBoardRoom = () => {
                     onChange={(e) => setShapeBorderColor(e.target.value)}
                   />
                 </>
-              )}
+              ) : null}
             </div>
+
+            {/* Size Controls */}
             <div className="item-center flex">
               <label className="mr-2 font-medium text-black text-sm">
                 Size:{" "}
@@ -302,11 +416,12 @@ const WhiteBoardRoom = () => {
                 type="range"
                 min="1"
                 max="10"
-                defaultValue={2}
+                value={lineSize}
                 onChange={(e) => setLineSize(Number(e.target.value))}
                 className="w-30"
               />
               <span className="text-black ml-4 text-sm">{lineSize}px</span>
+
               {selectedTool === "circle" && (
                 <>
                   <label className="mx-2 font-medium text-black text-sm">
@@ -316,7 +431,7 @@ const WhiteBoardRoom = () => {
                     type="range"
                     min="10"
                     max="100"
-                    defaultValue={50}
+                    value={shapeRadius}
                     onChange={(e) => setShapeRadius(Number(e.target.value))}
                     className="w-30"
                   />
@@ -329,13 +444,13 @@ const WhiteBoardRoom = () => {
               {selectedTool === "rectangle" && (
                 <>
                   <label className="mx-2 font-medium text-black text-sm">
-                    width:{" "}
+                    Width:{" "}
                   </label>
                   <input
                     type="range"
                     min="10"
                     max="500"
-                    defaultValue={30}
+                    value={shapeRadius}
                     onChange={(e) => setShapeRadius(Number(e.target.value))}
                     className="w-30"
                   />
@@ -349,7 +464,7 @@ const WhiteBoardRoom = () => {
                     type="range"
                     min="10"
                     max="500"
-                    defaultValue={30}
+                    value={shapeHeight}
                     onChange={(e) => setShapeHeight(Number(e.target.value))}
                     className="w-30"
                   />
@@ -360,25 +475,38 @@ const WhiteBoardRoom = () => {
               )}
             </div>
           </div>
-          <div>
+
+          <div className="flex items-center gap-2">
+            {selectedId && (
+              <div className="text-sm text-slate-600 bg-blue-100 px-3 py-1 rounded-lg">
+                {selectedType} selected - Use handles to resize
+              </div>
+            )}
             <Button variant="outlined" size="small" className="gap-2">
               <DownloadIcon style={{ fontSize: "1rem" }} />
               <span className="hidden sm:inline">Export</span>
             </Button>
           </div>
         </div>
+
         <Divider />
-        <div className="flex h-screen ">
-          {/* Left: Drawing Canvas */}
+
+        {/* Canvas */}
+        <div className="flex h-screen">
           <Stage
+            ref={stageRef}
             width={dimensions.width}
             height={dimensions.height}
             onMouseDown={handleMouseDown}
             onMousemove={handleMouseMove}
             onMouseup={handleMouseUp}
-            className="cursor-crosshair"
+            onClick={handleStageClick}
+            className={
+              selectedTool === "select" ? "cursor-default" : "cursor-crosshair"
+            }
           >
             <Layer>
+              {/* Lines */}
               {lines.map((line, i) => (
                 <Line
                   key={i}
@@ -394,60 +522,103 @@ const WhiteBoardRoom = () => {
               ))}
 
               {/* Circles */}
-              {circles.map((circle, i) => (
+              {circles.map((circle) => (
                 <Circle
-                  key={i}
+                  key={circle.id}
+                  id={circle.id}
                   {...circle}
-                  draggable
-                  onDragEnd={(e) =>
+                  draggable={selectedTool === "select"}
+                  onClick={() => handleShapeClick(circle.id, "circle")}
+                  onDragEnd={(e) => {
                     setCircles((prev) =>
-                      prev.map((c, index) =>
-                        index === i
+                      prev.map((c) =>
+                        c.id === circle.id
                           ? { ...c, x: e.target.x(), y: e.target.y() }
                           : c
                       )
-                    )
-                  }
-                  onClick={() => {
-                    if (selectedTool === "eraser") {
-                      const updatedCircles = circles.filter(
-                        (_, index) => index !== i
-                      );
-                      setCircles(updatedCircles);
-                    }
+                    );
                   }}
+                  onTransformEnd={(e) => {
+                    const node = e.target;
+                    handleTransform(circle.id, "circle", {
+                      x: node.x(),
+                      y: node.y(),
+                      radius: circle.radius,
+                      scaleX: node.scaleX(),
+                      scaleY: node.scaleY(),
+                    });
+                  }}
+                  stroke={selectedId === circle.id ? "#0066ff" : circle.stroke}
+                  strokeWidth={
+                    selectedId === circle.id
+                      ? circle.strokeWidth + 2
+                      : circle.strokeWidth
+                  }
                 />
               ))}
 
               {/* Rectangles */}
-              {rectangle.map((rectan, i) => (
+              {rectangles.map((rect) => (
                 <Rect
-                  key={i}
-                  {...rectan}
-                  draggable
-                  onDragEnd={(e) =>
-                    setRect((prev) =>
-                      prev.map((r, index) =>
-                        index === i
+                  key={rect.id}
+                  id={rect.id}
+                  {...rect}
+                  draggable={selectedTool === "select"}
+                  onClick={() => handleShapeClick(rect.id, "rectangle")}
+                  onDragEnd={(e) => {
+                    setRectangles((prev) =>
+                      prev.map((r) =>
+                        r.id === rect.id
                           ? { ...r, x: e.target.x(), y: e.target.y() }
                           : r
                       )
-                    )
-                  }
-                  onClick={() => {
-                    if (selectedTool === "eraser") {
-                      const updatedRectangle = rectangle.filter(
-                        (_, index) => index !== i
-                      );
-                      setRect(updatedRectangle);
-                    }
+                    );
                   }}
+                  onTransformEnd={(e) => {
+                    const node = e.target;
+                    handleTransform(rect.id, "rectangle", {
+                      x: node.x(),
+                      y: node.y(),
+                      width: rect.width,
+                      height: rect.height,
+                      scaleX: node.scaleX(),
+                      scaleY: node.scaleY(),
+                    });
+                  }}
+                  stroke={selectedId === rect.id ? "#0066ff" : rect.stroke}
+                  strokeWidth={
+                    selectedId === rect.id
+                      ? rect.strokeWidth + 2
+                      : rect.strokeWidth
+                  }
                 />
               ))}
+
+              {/* Transformer */}
+              <Transformer
+                ref={transformerRef}
+                boundBoxFunc={(oldBox, newBox) => {
+                  // Limit resize
+                  if (newBox.width < 5 || newBox.height < 5) {
+                    return oldBox;
+                  }
+                  return newBox;
+                }}
+                enabledAnchors={[
+                  "top-left",
+                  "top-center",
+                  "top-right",
+                  "middle-right",
+                  "middle-left",
+                  "bottom-left",
+                  "bottom-center",
+                  "bottom-right",
+                ]}
+              />
             </Layer>
           </Stage>
 
-          {/* Right: Chat Drawer */}
+          {/* Chat Drawer */}
           <ChatDrawer isOpen={isOpen} setIsOpen={setIsOpen} />
         </div>
       </div>
@@ -456,10 +627,3 @@ const WhiteBoardRoom = () => {
 };
 
 export default WhiteBoardRoom;
-//Circle
-//image
-//Line types
-//Rectangle
-//Rectangle Types
-//Text
-// When selectedTool is circle then apply then fill the circle if the circle with the selected color
