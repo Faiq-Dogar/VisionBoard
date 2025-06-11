@@ -1,6 +1,7 @@
 "use client";
 
 import { Stage, Layer, Line, Circle, Rect, Transformer } from "react-konva";
+import Konva from "konva";
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import PaletteIcon from "@mui/icons-material/Palette";
@@ -108,7 +109,6 @@ const WhiteBoardRoom = () => {
   const generateId = () => `shape_${Date.now()}_${Math.random()}`;
 
   const handleStageClick = (e: any) => {
-    // If clicking on stage (not on a shape)
     if (e.target === e.target.getStage()) {
       setSelectedId(null);
       setSelectedType(null);
@@ -117,7 +117,6 @@ const WhiteBoardRoom = () => {
   };
 
   const handleMouseDown = (e: any) => {
-    // If we're in select mode, don't create new shapes
     if (selectedTool === "select") {
       handleStageClick(e);
       return;
@@ -138,10 +137,9 @@ const WhiteBoardRoom = () => {
       };
       setCircles((prev) => [...prev, newCircle]);
 
-      // Auto-select the newly created circle
       setSelectedId(id);
       setSelectedType("circle");
-      setSelectedTool("select"); // Switch to select tool after creating
+      setSelectedTool("select");
       return;
     }
 
@@ -159,14 +157,12 @@ const WhiteBoardRoom = () => {
       };
       setRectangles((prev) => [...prev, newRect]);
 
-      // Auto-select the newly created rectangle
       setSelectedId(id);
       setSelectedType("rectangle");
-      setSelectedTool("select"); // Switch to select tool after creating
+      setSelectedTool("select");
       return;
     }
 
-    // Handle pen and eraser tools
     if (selectedTool === "pen" || selectedTool === "eraser") {
       isDrawing.current = true;
       setLines([
@@ -212,7 +208,6 @@ const WhiteBoardRoom = () => {
       return;
     }
 
-    // Select the shape
     setSelectedId(id);
     setSelectedType(type);
   };
@@ -253,6 +248,43 @@ const WhiteBoardRoom = () => {
   };
 
   if (dimensions.width === 0 || dimensions.height === 0) return null;
+
+  const handleDownload = () => {
+    if (!stageRef.current) return;
+
+    const stage = stageRef.current;
+    const layer = stage.getLayers()[0];
+
+    // Create a white background rectangle
+    const background = new Konva.Rect({
+      x: 0,
+      y: 0,
+      width: stage.width(),
+      height: stage.height(),
+      fill: "white",
+      listening: false,
+    });
+
+    layer.add(background);
+    background.moveToBottom();
+    layer.draw();
+
+    const uri = stage.toDataURL({
+      mimeType: "image/jpeg",
+      quality: 1.0,
+      pixelRatio: 2,
+    });
+
+    background.destroy();
+    layer.draw();
+
+    const link = document.createElement("a");
+    link.download = "whiteboard.jpeg";
+    link.href = uri;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <>
@@ -482,7 +514,12 @@ const WhiteBoardRoom = () => {
                 {selectedType} selected - Use handles to resize
               </div>
             )}
-            <Button variant="outlined" size="small" className="gap-2">
+            <Button
+              variant="outlined"
+              size="small"
+              className="gap-2"
+              onClick={handleDownload}
+            >
               <DownloadIcon style={{ fontSize: "1rem" }} />
               <span className="hidden sm:inline">Export</span>
             </Button>
@@ -627,3 +664,8 @@ const WhiteBoardRoom = () => {
 };
 
 export default WhiteBoardRoom;
+
+//image
+//Line types
+//Text
+// When selectedTool is circle then apply then fill the circle if the circle with the selected color
