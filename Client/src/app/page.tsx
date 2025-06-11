@@ -12,6 +12,9 @@ import {
   Button,
   Input,
 } from "@mui/material";
+import FlashOnIcon from "@mui/icons-material/FlashOn";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { useState } from "react";
 import {
   ArrowRight,
@@ -50,37 +53,63 @@ export default function HomePage() {
       <div className="absolute -top-20 -left-20 w-96 h-96 bg-indigo-200 rounded-full blur-3xl opacity-30 animate-pulse"></div>
       <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-300 rounded-full blur-3xl opacity-20 animate-pulse"></div>
 
-      {/* Foreground content */}
-      <motion.h1
-        initial={{ opacity: 0, y: -20 }}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
-        // className="text-7xl md:text-8xl font-black bg-gradient-to-r from-slate-900 via-indigo-900 to-purple-900 bg-clip-text text-transparent mb-4 leading-tight"
-        className="text-6xl font-extrabold text-gray-900 drop-shadow-md"
+        transition={{ duration: 0.8, delay: 0.2 }}
+        className="text-center mb-6"
       >
-        VisionBoard
-      </motion.h1>
+        <h1 className="text-7xl md:text-8xl font-black bg-gradient-to-r from-slate-900 via-indigo-900 to-purple-900 bg-clip-text text-transparent mb-4 leading-tight">
+          VisionBoard
+        </h1>
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{
+              duration: 8,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "linear",
+            }}
+            className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center"
+          >
+            <FlashOnIcon className="text-white" style={{ fontSize: "1rem" }} />
+          </motion.div>
+          <span className="text-lg font-semibold text-slate-600">
+            Powered by Team DeadLock
+          </span>
+        </div>
+      </motion.div>
 
       <motion.p
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1, delay: 0.3 }}
-        className="mt-3 text-xl text-gray-700 max-w-md"
+        transition={{ duration: 0.8, delay: 0.4 }}
+        className="text-2xl md:text-3xl text-slate-700 max-w-3xl text-center mb-8 leading-relaxed font-light"
       >
-        Create, collaborate, and connect — all on a real-time whiteboard.
+        Create, collaborate, and connect — all on a{" "}
+        <span className="font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+          real-time whiteboard
+        </span>{" "}
+        that brings your ideas to life.
       </motion.p>
 
       <motion.button
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, delay: 0.6 }}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
         onClick={handleDialogOpen}
-        className="mt-8 px-8 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-medium text-lg rounded-full shadow-lg hover:scale-105 transition-transform duration-200 cursor-pointer"
+        className="group relative px-8 py-4 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 text-white font-semibold text-lg rounded-2xl shadow-2xl hover:shadow-indigo-500/25 transition-all duration-300 cursor-pointer"
       >
-        Start Whiteboard
+        <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl blur opacity-75 group-hover:opacity-100 transition-opacity duration-300" />
+        <div className="relative flex items-center gap-2">
+          <PlayArrowIcon style={{ fontSize: "1.25rem" }} />
+          Start Whiteboard Now
+          <ArrowForwardIcon
+            className="group-hover:translate-x-1 transition-transform duration-200"
+            style={{ fontSize: "1.25rem" }}
+          />
+        </div>
       </motion.button>
 
-      {/* Dialog with Framer animation */}
       <AnimatePresence>
         {open && (
           <>

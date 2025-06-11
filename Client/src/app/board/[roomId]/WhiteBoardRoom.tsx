@@ -255,7 +255,6 @@ const WhiteBoardRoom = () => {
     const stage = stageRef.current;
     const layer = stage.getLayers()[0];
 
-    // Create a white background rectangle
     const background = new Konva.Rect({
       x: 0,
       y: 0,
