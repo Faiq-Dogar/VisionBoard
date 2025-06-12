@@ -59,21 +59,21 @@ export default function ChatDrawer({ isOpen, setIsOpen }: ChatDrawerProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
-      user: "Alice",
+      user: "Aneeqa",
       content: "Hey there! Welcome to the whiteboard session.",
       timestamp: new Date(Date.now() - 300000),
       avatar: "",
     },
     {
       id: 2,
-      user: "Bob",
+      user: "Wasil",
       content: "Great! Let's start brainstorming some ideas.",
       timestamp: new Date(Date.now() - 240000),
       avatar: "",
     },
     {
       id: 3,
-      user: "Charlie",
+      user: "Rafay",
       content: "I'll start by drawing the main concept.",
       timestamp: new Date(Date.now() - 180000),
       avatar: "",

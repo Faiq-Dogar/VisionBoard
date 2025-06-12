@@ -1,6 +1,14 @@
 "use client";
 
-import { Stage, Layer, Line, Circle, Rect, Transformer } from "react-konva";
+import {
+  Stage,
+  Layer,
+  Line,
+  Circle,
+  Rect,
+  Transformer,
+  Image,
+} from "react-konva";
 import Konva from "konva";
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
@@ -9,6 +17,8 @@ import EditIcon from "@mui/icons-material/Edit";
 import ClearOutlinedIcon from "@mui/icons-material/ClearOutlined";
 import CircleOutlinedIcon from "@mui/icons-material/CircleOutlined";
 import SquareOutlinedIcon from "@mui/icons-material/CropSquare";
+import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
+import TextFormatOutlinedIcon from "@mui/icons-material/TextFormatOutlined";
 import DownloadIcon from "@mui/icons-material/Download";
 import ShareIcon from "@mui/icons-material/Share";
 import PeopleIcon from "@mui/icons-material/People";
@@ -32,18 +42,32 @@ const tools = [
   { id: "eraser", icon: ClearOutlinedIcon, label: "Eraser" },
   { id: "circle", icon: CircleOutlinedIcon, label: "Circle" },
   { id: "rectangle", icon: SquareOutlinedIcon, label: "Rectangle" },
+  { id: "image", icon: ImageOutlinedIcon, label: "Image" },
+  { id: "text", icon: TextFormatOutlinedIcon, label: "Text" },
 ];
+
+interface ImageObject {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  image: HTMLImageElement;
+  rotation?: number;
+}
 
 const WhiteBoardRoom = () => {
   const [lines, setLines] = useState<any[]>([]);
   const [circles, setCircles] = useState<any[]>([]);
   const [rectangles, setRectangles] = useState<any[]>([]);
+  const [images, setImages] = useState<ImageObject[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<string | null>(null);
 
   const isDrawing = useRef(false);
   const transformerRef = useRef<any>(null);
   const stageRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [lineColor, setLineColor] = useState<string>("#000");
@@ -54,6 +78,7 @@ const WhiteBoardRoom = () => {
   const [lineSize, setLineSize] = useState<number>(2);
   const [selectedTool, setSelectedTool] = useState("pen");
   const [isOpen, setIsOpen] = useState<boolean>(true);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
 
   const [connectedUsers] = useState([
     {
@@ -63,12 +88,12 @@ const WhiteBoardRoom = () => {
     },
     {
       id: "2",
-      name: "Sarah",
+      name: "Aneeqa",
       color: "#3c81f8",
     },
     {
       id: "3",
-      name: "Mike",
+      name: "Rafay",
       color: "#ef4444",
     },
   ]);
@@ -119,6 +144,13 @@ const WhiteBoardRoom = () => {
   const handleMouseDown = (e: any) => {
     if (selectedTool === "select") {
       handleStageClick(e);
+      return;
+    }
+
+    if (selectedTool === "image") {
+      if (fileInputRef.current) {
+        fileInputRef.current.click();
+      }
       return;
     }
 
@@ -204,6 +236,8 @@ const WhiteBoardRoom = () => {
         setCircles((prev) => prev.filter((circle) => circle.id !== id));
       } else if (type === "rectangle") {
         setRectangles((prev) => prev.filter((rect) => rect.id !== id));
+      } else if (type === "image") {
+        setImages((prev) => prev.filter((image) => image.id !== id));
       }
       return;
     }
@@ -244,7 +278,94 @@ const WhiteBoardRoom = () => {
             : rect
         )
       );
+    } else if (type === "image") {
+      setImages((prev) =>
+        prev.map((img) =>
+          img.id === id
+            ? {
+                ...img,
+                x: newAttrs.x,
+                y: newAttrs.y,
+                width: Math.max(newAttrs.width * newAttrs.scaleX, 5),
+                height: Math.max(newAttrs.height * newAttrs.scaleY, 5),
+                rotation: newAttrs.rotation,
+                scaleX: 1,
+                scaleY: 1,
+              }
+            : img
+        )
+      );
     }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+
+    const file = e.target.files[0];
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file");
+      return;
+    }
+
+    setIsUploading(true);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (!event.target?.result) return;
+
+      const img = new window.Image();
+      img.src = event.target.result as string;
+      img.onload = () => {
+        const id = generateId();
+        const aspectRatio = img.width / img.height;
+
+        // Calculate position to center the image
+        const stageWidth = dimensions.width;
+        const stageHeight = dimensions.height;
+
+        // Set a maximum size for the image (50% of the smaller dimension)
+        const maxWidth = stageWidth * 0.5;
+        const maxHeight = stageHeight * 0.5;
+
+        let width, height;
+        if (img.width > maxWidth || img.height > maxHeight) {
+          if (aspectRatio > 1) {
+            width = maxWidth;
+            height = maxWidth / aspectRatio;
+          } else {
+            height = maxHeight;
+            width = maxHeight * aspectRatio;
+          }
+        } else {
+          width = img.width;
+          height = img.height;
+        }
+
+        const x = (stageWidth - width) / 2;
+        const y = (stageHeight - height) / 2;
+
+        const newImage: ImageObject = {
+          id,
+          x,
+          y,
+          width,
+          height,
+          image: img,
+        };
+
+        setImages((prev) => [...prev, newImage]);
+        setSelectedId(id);
+        setSelectedType("image");
+        setSelectedTool("select");
+        setIsUploading(false);
+
+        // Reset file input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      };
+    };
+    reader.readAsDataURL(file);
   };
 
   if (dimensions.width === 0 || dimensions.height === 0) return null;
@@ -288,6 +409,13 @@ const WhiteBoardRoom = () => {
   return (
     <>
       <div className="relative h-screen w-screen bg-gradient-to-br from-[#f0f4ff] via-white to-[#f4f7ff] overflow-hidden flex flex-col justify-center px-4">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageUpload}
+          style={{ display: "none" }}
+        />
         {/* Header */}
         <div className="flex items-center gap-4 justify-between">
           <div className="flex items-center">
@@ -371,10 +499,16 @@ const WhiteBoardRoom = () => {
                   variant={selectedTool === tool.id ? "contained" : "text"}
                   size="small"
                   onClick={() => {
-                    setSelectedTool(tool.id);
-                    if (tool.id !== "select") {
-                      setSelectedId(null);
-                      setSelectedType(null);
+                    if (tool.id === "image") {
+                      if (fileInputRef.current) {
+                        fileInputRef.current.click();
+                      }
+                    } else {
+                      setSelectedTool(tool.id);
+                      if (tool.id !== "select") {
+                        setSelectedId(null);
+                        setSelectedType(null);
+                      }
                     }
                   }}
                   className={`gap-2 ${
@@ -385,6 +519,9 @@ const WhiteBoardRoom = () => {
                 >
                   <tool.icon style={{ fontSize: "1rem" }} />
                   <span className="hidden sm:inline">{tool.label}</span>
+                  {tool.id === "image" && isUploading && (
+                    <span className="animate-pulse ml-1">•</span>
+                  )}{" "}
                 </Button>
               ))}
             </div>
@@ -630,6 +767,44 @@ const WhiteBoardRoom = () => {
                 />
               ))}
 
+              {images.map((img) => (
+                <Image
+                  key={img.id}
+                  id={img.id}
+                  x={img.x}
+                  y={img.y}
+                  width={img.width}
+                  height={img.height}
+                  image={img.image}
+                  rotation={img.rotation || 0}
+                  draggable={selectedTool === "select"}
+                  onClick={() => handleShapeClick(img.id, "image")}
+                  onDragEnd={(e) => {
+                    setImages((prev) =>
+                      prev.map((i) =>
+                        i.id === img.id
+                          ? { ...i, x: e.target.x(), y: e.target.y() }
+                          : i
+                      )
+                    );
+                  }}
+                  onTransformEnd={(e) => {
+                    const node = e.target;
+                    handleTransform(img.id, "image", {
+                      x: node.x(),
+                      y: node.y(),
+                      width: img.width,
+                      height: img.height,
+                      rotation: node.rotation(),
+                      scaleX: node.scaleX(),
+                      scaleY: node.scaleY(),
+                    });
+                  }}
+                  stroke={selectedId === img.id ? "#0066ff" : undefined}
+                  strokeWidth={selectedId === img.id ? 2 : 0}
+                  strokeEnabled={selectedId === img.id}
+                />
+              ))}
               {/* Transformer */}
               <Transformer
                 ref={transformerRef}
@@ -664,7 +839,7 @@ const WhiteBoardRoom = () => {
 
 export default WhiteBoardRoom;
 
-//image
-//Line types
+//Rounded corners
 //Text
-// When selectedTool is circle then apply then fill the circle if the circle with the selected color
+//Share room link
+//If someone transforms an element for the forst time, It's working perfectly. But from furtheron, the scaling is not working properly.
