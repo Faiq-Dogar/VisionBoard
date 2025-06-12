@@ -8,6 +8,7 @@ import {
   Rect,
   Transformer,
   Image,
+  Text as KonvaText,
 } from "react-konva";
 import Konva from "konva";
 import { useState, useRef, useEffect } from "react";
@@ -19,11 +20,24 @@ import CircleOutlinedIcon from "@mui/icons-material/CircleOutlined";
 import SquareOutlinedIcon from "@mui/icons-material/CropSquare";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import TextFormatOutlinedIcon from "@mui/icons-material/TextFormatOutlined";
+import FormatBoldIcon from "@mui/icons-material/FormatBold";
+import FormatItalicIcon from "@mui/icons-material/FormatItalic";
+import FormatUnderlinedIcon from "@mui/icons-material/FormatUnderlined";
 import DownloadIcon from "@mui/icons-material/Download";
 import ShareIcon from "@mui/icons-material/Share";
 import PeopleIcon from "@mui/icons-material/People";
 import MouseIcon from "@mui/icons-material/Mouse";
-import { Avatar, Badge, Button, Divider } from "@mui/material";
+import {
+  Avatar,
+  Badge,
+  Button,
+  Divider,
+  Popover,
+  Select,
+  MenuItem,
+  IconButton,
+  FormControl,
+} from "@mui/material";
 import ChatDrawer from "./ChatDrawer";
 
 const lineColorOptions = [
@@ -46,6 +60,18 @@ const tools = [
   { id: "text", icon: TextFormatOutlinedIcon, label: "Text" },
 ];
 
+const fontFamilies = [
+  "Arial",
+  "Helvetica",
+  "Times New Roman",
+  "Courier New",
+  "Georgia",
+  "Verdana",
+  "Impact",
+];
+
+const fontSizes = [12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72];
+
 interface ImageObject {
   id: string;
   x: number;
@@ -56,18 +82,46 @@ interface ImageObject {
   rotation?: number;
 }
 
+interface TextObject {
+  id: string;
+  x: number;
+  y: number;
+  text: string;
+  fontSize: number;
+  fontFamily: string;
+  fill: string;
+  width?: number;
+  height?: number;
+  rotation?: number;
+  fontStyle?: string;
+  align?: string;
+  textDecoration?: string;
+}
+
 const WhiteBoardRoom = () => {
   const [lines, setLines] = useState<any[]>([]);
   const [circles, setCircles] = useState<any[]>([]);
   const [rectangles, setRectangles] = useState<any[]>([]);
   const [images, setImages] = useState<ImageObject[]>([]);
+  const [texts, setTexts] = useState<TextObject[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [textEditVisible, setTextEditVisible] = useState<boolean>(false);
+  const [currentTextValue, setCurrentTextValue] = useState<string>("");
+  const [textAnchorEl, setTextAnchorEl] = useState<HTMLElement | null>(null);
+  const [textColor, setTextColor] = useState<string>("#000000");
+  const [fontSize, setFontSize] = useState<number>(24);
+  const [fontFamily, setFontFamily] = useState<string>("Arial");
+  const [isBold, setIsBold] = useState<boolean>(false);
+  const [isItalic, setIsItalic] = useState<boolean>(false);
+  const [isUnderlined, setIsUnderlined] = useState<boolean>(false);
 
   const isDrawing = useRef(false);
   const transformerRef = useRef<any>(null);
   const stageRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  const textNodeRef = useRef<any>(null);
 
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [lineColor, setLineColor] = useState<string>("#000");
@@ -131,9 +185,35 @@ const WhiteBoardRoom = () => {
     }
   }, [selectedId]);
 
+  // Handle double click on text to edit
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && textEditVisible) {
+        setTextEditVisible(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [textEditVisible]);
+
+  // Focus text area when editing starts
+  useEffect(() => {
+    if (textEditVisible && textAreaRef.current) {
+      textAreaRef.current.focus();
+    }
+  }, [textEditVisible]);
+
   const generateId = () => `shape_${Date.now()}_${Math.random()}`;
 
   const handleStageClick = (e: any) => {
+    if (textEditVisible) {
+      setTextEditVisible(false);
+      updateTextAfterEdit();
+    }
+
     if (e.target === e.target.getStage()) {
       setSelectedId(null);
       setSelectedType(null);
@@ -195,6 +275,27 @@ const WhiteBoardRoom = () => {
       return;
     }
 
+    if (selectedTool === "text") {
+      const id = generateId();
+      const newText: TextObject = {
+        id,
+        x: pos.x,
+        y: pos.y,
+        text: "Double-click to edit",
+        fontSize,
+        fontFamily,
+        fill: textColor,
+        fontStyle: getFontStyle(),
+        textDecoration: isUnderlined ? "underline" : "",
+        align: "left",
+      };
+      setTexts((prev) => [...prev, newText]);
+      setSelectedId(id);
+      setSelectedType("text");
+      setSelectedTool("select");
+      return;
+    }
+
     if (selectedTool === "pen" || selectedTool === "eraser") {
       isDrawing.current = true;
       setLines([
@@ -238,12 +339,101 @@ const WhiteBoardRoom = () => {
         setRectangles((prev) => prev.filter((rect) => rect.id !== id));
       } else if (type === "image") {
         setImages((prev) => prev.filter((image) => image.id !== id));
+      } else if (type === "text") {
+        setTexts((prev) => prev.filter((text) => text.id !== id));
       }
       return;
     }
 
     setSelectedId(id);
     setSelectedType(type);
+
+    if (type === "text") {
+      const selectedText = texts.find((t) => t.id === id);
+      if (selectedText) {
+        setTextColor(selectedText.fill);
+        setFontSize(selectedText.fontSize);
+        setFontFamily(selectedText.fontFamily);
+        setIsBold(selectedText.fontStyle?.includes("bold") || false);
+        setIsItalic(selectedText.fontStyle?.includes("italic") || false);
+        setIsUnderlined(selectedText.textDecoration === "underline");
+      }
+    }
+  };
+
+  const handleTextDblClick = (e: any, id: string) => {
+    // Prevent stage click handler
+    e.cancelBubble = true;
+
+    const text = texts.find((t) => t.id === id);
+    if (!text) return;
+
+    // Get position of text for the editor
+    const textNode = e.target;
+    const stage = textNode.getStage();
+    const position = textNode.absolutePosition();
+
+    // Set the text editor position and content
+    setCurrentTextValue(text.text);
+    setTextEditVisible(true);
+    textNodeRef.current = textNode;
+
+    // Position the text editor
+    if (textAreaRef.current) {
+      const areaPosition = {
+        x: position.x,
+        y: position.y,
+      };
+
+      textAreaRef.current.style.position = "absolute";
+      textAreaRef.current.style.top = `${areaPosition.y}px`;
+      textAreaRef.current.style.left = `${areaPosition.x}px`;
+      textAreaRef.current.style.width = `${Math.max(
+        textNode.width() * textNode.scaleX(),
+        100
+      )}px`;
+      textAreaRef.current.style.height = `${Math.max(
+        textNode.height() * textNode.scaleY(),
+        50
+      )}px`;
+      textAreaRef.current.style.fontSize = `${text.fontSize}px`;
+      textAreaRef.current.style.fontFamily = text.fontFamily;
+      textAreaRef.current.style.color = text.fill;
+      textAreaRef.current.style.fontWeight = text.fontStyle?.includes("bold")
+        ? "bold"
+        : "normal";
+      textAreaRef.current.style.fontStyle = text.fontStyle?.includes("italic")
+        ? "italic"
+        : "normal";
+      textAreaRef.current.style.textDecoration = text.textDecoration || "none";
+    }
+  };
+
+  const updateTextAfterEdit = () => {
+    if (!selectedId) return;
+
+    setTexts((prev) =>
+      prev.map((t) =>
+        t.id === selectedId
+          ? {
+              ...t,
+              text: currentTextValue,
+              fill: textColor,
+              fontSize,
+              fontFamily,
+              fontStyle: getFontStyle(),
+              textDecoration: isUnderlined ? "underline" : "",
+            }
+          : t
+      )
+    );
+  };
+
+  const getFontStyle = () => {
+    let style = "";
+    if (isBold) style += "bold ";
+    if (isItalic) style += "italic";
+    return style.trim();
   };
 
   const handleTransform = (id: string, type: string, newAttrs: any) => {
@@ -293,6 +483,23 @@ const WhiteBoardRoom = () => {
                 scaleY: 1,
               }
             : img
+        )
+      );
+    } else if (type === "text") {
+      setTexts((prev) =>
+        prev.map((txt) =>
+          txt.id === id
+            ? {
+                ...txt,
+                x: newAttrs.x,
+                y: newAttrs.y,
+                width: Math.max(newAttrs.width * newAttrs.scaleX, 5),
+                height: Math.max(newAttrs.height * newAttrs.scaleY, 5),
+                rotation: newAttrs.rotation,
+                scaleX: 1,
+                scaleY: 1,
+              }
+            : txt
         )
       );
     }
@@ -406,6 +613,14 @@ const WhiteBoardRoom = () => {
     document.body.removeChild(link);
   };
 
+  const handleTextFormatting = (event: React.MouseEvent<HTMLElement>) => {
+    setTextAnchorEl(event.currentTarget);
+  };
+
+  const handleCloseTextFormatting = () => {
+    setTextAnchorEl(null);
+    updateTextAfterEdit();
+  };
   return (
     <>
       <div className="relative h-screen w-screen bg-gradient-to-br from-[#f0f4ff] via-white to-[#f4f7ff] overflow-hidden flex flex-col justify-center px-4">
@@ -416,6 +631,26 @@ const WhiteBoardRoom = () => {
           onChange={handleImageUpload}
           style={{ display: "none" }}
         />
+        {textEditVisible && (
+          <textarea
+            ref={textAreaRef}
+            value={currentTextValue}
+            onChange={(e) => setCurrentTextValue(e.target.value)}
+            style={{
+              position: "absolute",
+              top: "10%",
+              zIndex: 1000,
+              border: "1px solid #0066ff",
+              padding: "5px",
+              margin: 0,
+              overflow: "hidden",
+              background: "rgba(255,255,255,0.8)",
+              outline: "none",
+              resize: "both",
+              color: "black",
+            }}
+          />
+        )}
         {/* Header */}
         <div className="flex items-center gap-4 justify-between">
           <div className="flex items-center">
@@ -572,23 +807,163 @@ const WhiteBoardRoom = () => {
                     onChange={(e) => setShapeBorderColor(e.target.value)}
                   />
                 </>
+              ) : selectedTool === "text" ||
+                (selectedType === "text" && selectedId) ? (
+                <>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleTextFormatting}
+                    className="flex items-center gap-1"
+                  >
+                    <TextFormatOutlinedIcon style={{ fontSize: "1rem" }} />
+                    Text Format
+                  </Button>
+                  <Popover
+                    open={Boolean(textAnchorEl)}
+                    anchorEl={textAnchorEl}
+                    onClose={handleCloseTextFormatting}
+                    anchorOrigin={{
+                      vertical: "bottom",
+                      horizontal: "left",
+                    }}
+                    transformOrigin={{
+                      vertical: "top",
+                      horizontal: "left",
+                    }}
+                  >
+                    <div className="p-4 w-80">
+                      <h3 className="text-lg font-medium mb-3">
+                        Text Formatting
+                      </h3>
+
+                      <div className="mb-3">
+                        <label className="block text-sm font-medium mb-1">
+                          Color
+                        </label>
+                        <div className="flex gap-2">
+                          {lineColorOptions.map((color) => (
+                            <div
+                              key={color.name}
+                              className={`w-6 h-6 rounded-full cursor-pointer border ${
+                                textColor === color.value
+                                  ? "border-black border-2"
+                                  : "border-gray-300"
+                              }`}
+                              style={{ backgroundColor: color.value }}
+                              onClick={() => setTextColor(color.value)}
+                            />
+                          ))}
+                          <input
+                            type="color"
+                            value={textColor}
+                            onChange={(e) => setTextColor(e.target.value)}
+                            className="w-6 h-6 cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 mb-3">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">
+                            Font Size
+                          </label>
+                          <FormControl fullWidth size="small">
+                            <Select
+                              value={fontSize}
+                              onChange={(e) =>
+                                setFontSize(Number(e.target.value))
+                              }
+                            >
+                              {fontSizes.map((size) => (
+                                <MenuItem key={size} value={size}>
+                                  {size}px
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium mb-1">
+                            Font Family
+                          </label>
+                          <FormControl fullWidth size="small">
+                            <Select
+                              value={fontFamily}
+                              onChange={(e) =>
+                                setFontFamily(e.target.value as string)
+                              }
+                            >
+                              {fontFamilies.map((font) => (
+                                <MenuItem
+                                  key={font}
+                                  value={font}
+                                  style={{ fontFamily: font }}
+                                >
+                                  {font}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-center gap-2 mb-3">
+                        <IconButton
+                          color={isBold ? "primary" : "default"}
+                          onClick={() => setIsBold(!isBold)}
+                          size="small"
+                        >
+                          <FormatBoldIcon />
+                        </IconButton>
+                        <IconButton
+                          color={isItalic ? "primary" : "default"}
+                          onClick={() => setIsItalic(!isItalic)}
+                          size="small"
+                        >
+                          <FormatItalicIcon />
+                        </IconButton>
+                        <IconButton
+                          color={isUnderlined ? "primary" : "default"}
+                          onClick={() => setIsUnderlined(!isUnderlined)}
+                          size="small"
+                        >
+                          <FormatUnderlinedIcon />
+                        </IconButton>
+                      </div>
+
+                      <Button
+                        variant="contained"
+                        fullWidth
+                        onClick={handleCloseTextFormatting}
+                      >
+                        Apply Formatting
+                      </Button>
+                    </div>
+                  </Popover>
+                </>
               ) : null}
             </div>
 
             {/* Size Controls */}
             <div className="item-center flex">
-              <label className="mr-2 font-medium text-black text-sm">
-                Size:{" "}
-              </label>
-              <input
-                type="range"
-                min="1"
-                max="10"
-                value={lineSize}
-                onChange={(e) => setLineSize(Number(e.target.value))}
-                className="w-30"
-              />
-              <span className="text-black ml-4 text-sm">{lineSize}px</span>
+              {selectedTool !== "select" && (
+                <>
+                  <label className="mr-2 font-medium text-black text-sm">
+                    Size:{" "}
+                  </label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="10"
+                    value={lineSize}
+                    onChange={(e) => setLineSize(Number(e.target.value))}
+                    className="w-30"
+                  />
+                  <span className="text-black ml-4 text-sm">{lineSize}px</span>
+                </>
+              )}
 
               {selectedTool === "circle" && (
                 <>
@@ -648,6 +1023,7 @@ const WhiteBoardRoom = () => {
             {selectedId && (
               <div className="text-sm text-slate-600 bg-blue-100 px-3 py-1 rounded-lg">
                 {selectedType} selected - Use handles to resize
+                {selectedType === "text" && " (Double-click to edit)"}
               </div>
             )}
             <Button
@@ -805,6 +1181,55 @@ const WhiteBoardRoom = () => {
                   strokeEnabled={selectedId === img.id}
                 />
               ))}
+
+              {/* Text Elements */}
+              {texts.map((text) => (
+                <KonvaText
+                  key={text.id}
+                  id={text.id}
+                  x={text.x}
+                  y={text.y}
+                  text={text.text}
+                  fontSize={text.fontSize}
+                  fontFamily={text.fontFamily}
+                  fill={text.fill}
+                  width={text.width}
+                  height={text.height}
+                  rotation={text.rotation || 0}
+                  draggable={selectedTool === "select"}
+                  fontStyle={text.fontStyle}
+                  textDecoration={text.textDecoration}
+                  align={text.align}
+                  onClick={() => handleShapeClick(text.id, "text")}
+                  onDblClick={(e) => handleTextDblClick(e, text.id)}
+                  onDragEnd={(e) => {
+                    setTexts((prev) =>
+                      prev.map((t) =>
+                        t.id === text.id
+                          ? { ...t, x: e.target.x(), y: e.target.y() }
+                          : t
+                      )
+                    );
+                  }}
+                  onTransformEnd={(e) => {
+                    const node = e.target;
+                    handleTransform(text.id, "text", {
+                      x: node.x(),
+                      y: node.y(),
+                      width: node.width() * node.scaleX(),
+                      height: node.height() * node.scaleY(),
+                      rotation: node.rotation(),
+                      scaleX: 1,
+                      scaleY: 1,
+                    });
+                  }}
+                  stroke={selectedId === text.id ? "#0066ff" : undefined}
+                  strokeWidth={selectedId === text.id ? 1 : 0}
+                  strokeEnabled={selectedId === text.id}
+                  padding={5}
+                />
+              ))}
+
               {/* Transformer */}
               <Transformer
                 ref={transformerRef}
